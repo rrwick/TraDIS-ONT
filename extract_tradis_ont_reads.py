@@ -151,10 +151,9 @@ def extract_reads(reads, start, end, neg, threads, min_id, max_gap, neg_id, neg_
 def align_reads(reads, target, threads, min_id, max_gap, negative=False):
     print(f'\nAligning {reads} to {target}:', file=sys.stderr)
 
-    minimap2_command = ['minimap2', '-c', '-x', 'map-ont', '-t', str(threads),
-                        str(target), str(reads)]
+    mm2_cmd = ['minimap2', '-c', '-x', 'map-ont', '-t', str(threads), str(target), str(reads)]
     alignments = []
-    with subprocess.Popen(minimap2_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True) as p:
+    with subprocess.Popen(mm2_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True) as p:
         for line in p.stdout:
             alignments.append(Alignment(line.strip()))
         error_message = p.stderr.read()
@@ -179,19 +178,15 @@ def align_reads(reads, target, threads, min_id, max_gap, negative=False):
 
 
 class Alignment(object):
-
     def __init__(self, paf_line):
         line_parts = paf_line.strip().split('\t')
         assert len(line_parts) >= 11
-
         self.query_name = line_parts[0]
         self.query_start = int(line_parts[2])
         self.query_end = int(line_parts[3])
         self.strand = line_parts[4] == '+'
-
         self.start_gap = int(line_parts[7])
         self.end_gap = int(line_parts[6]) - int(line_parts[8])
-
         self.percent_identity = 100.0 * int(line_parts[9]) / int(line_parts[10])
 
 
