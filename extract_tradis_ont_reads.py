@@ -18,7 +18,6 @@ see <https://www.gnu.org/licenses/>.
 import argparse
 import collections
 import gzip
-import os
 import pathlib
 import subprocess
 import sys
@@ -101,12 +100,11 @@ def extract_reads(reads, start, end, neg, threads, min_id, max_gap, neg_id, neg_
         if end is not None and start_a.strand != end_a.strand:
             bad_strand += 1
             continue
-        strand = start_a.strand
 
-        start_trim = start_a.query_end if strand == '+' else start_a.query_start
-        end_trim = None if end is None else end_a.query_start if strand == '+' else end_a.query_end
+        start_trim = start_a.query_end if start_a.strand else start_a.query_start
+        end_trim = None if end is None else end_a.query_start if start_a.strand else end_a.query_end
 
-        if strand == '-':
+        if not start_a.strand:  # - strand
             seq, qual = reverse_complement(seq), qual[::-1]
             start_trim = len(seq) - start_trim
             end_trim = None if end is None else len(seq) - end_trim
@@ -155,14 +153,18 @@ def align_reads(reads, target, threads, min_id, max_gap, negative=False):
 
     minimap2_command = ['minimap2', '-c', '-x', 'map-ont', '-t', str(threads),
                         str(target), str(reads)]
-    with open(os.devnull, 'w') as dev_null:
-        out = subprocess.check_output(minimap2_command, stderr=dev_null)
-    alignments = [Alignment(x) for x in out.decode().splitlines()]
+    alignments = []
+    with subprocess.Popen(minimap2_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True) as p:
+        for line in p.stdout:
+            alignments.append(Alignment(line.strip()))
+        error_message = p.stderr.read()
+    if p.returncode != 0:
+        sys.exit(f'\nError: minimap2 failed with the following error:\n{error_message}')
+
     plural = '' if len(alignments) == 1 else 's'
     print(f'  {len(alignments)} alignment{plural}', file=sys.stderr)
 
-    alignments = [a for a in alignments if a.target_start <= max_gap and
-                  a.target_length - a.target_end <= max_gap]
+    alignments = [a for a in alignments if a.start_gap <= max_gap and a.end_gap <= max_gap]
     arg_name = 'neg_gap' if negative else 'max_gap'
     print(f'  {len(alignments)} pass --{arg_name} {max_gap}', file=sys.stderr)
 
@@ -183,15 +185,12 @@ class Alignment(object):
         assert len(line_parts) >= 11
 
         self.query_name = line_parts[0]
-        self.query_length = int(line_parts[1])
         self.query_start = int(line_parts[2])
         self.query_end = int(line_parts[3])
-        self.strand = line_parts[4]
+        self.strand = line_parts[4] == '+'
 
-        self.target_name = line_parts[5]
-        self.target_length = int(line_parts[6])
-        self.target_start = int(line_parts[7])
-        self.target_end = int(line_parts[8])
+        self.start_gap = int(line_parts[7])
+        self.end_gap = int(line_parts[6]) - int(line_parts[8])
 
         self.percent_identity = 100.0 * int(line_parts[9]) / int(line_parts[10])
 
