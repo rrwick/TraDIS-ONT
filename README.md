@@ -1,13 +1,33 @@
-# Extract TraDIS ONT reads
+# TraDIS ONT scripts
 
 [![License GPL v3](https://img.shields.io/badge/license-GPL%20v3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0.en.html)
 
-This tool finds ONT reads which match expectations for TraDIS sequencing, and it outputs those reads trimmed down to their genomic sequence.
 
-It can be run like this:
+
+
+## Installation
+
+This repo contains stand-alone Python scripts, so no installation is required. You can run the scripts directly from this repo, or copy them to somewhere in your `PATH` (e.g. `~/.local/bin`) for easier access.
+
+There is one external requirement: [minimap2](https://github.com/lh3/minimap2). If you can run `minimap2 -h` from the command line, you should be good to go.
+
+
+
+
+## Quick usage
+
 ```bash
-extract_tradis_ont_reads.py --reads ont.fastq.gz --start start.fasta --end end.fasta > out.fastq
+extract_tradis_ont_reads.py --reads ont.fastq.gz --start start.fasta --end end.fasta > trimmed.fastq
+minimap2 -c -t 32 reference.fasta trimmed.fastq > alignments.paf
+create_plot_files.py --ref reference.fasta --alignments alignments.paf --out_dir plot_files
 ```
+
+
+
+
+## `extract_tradis_ont_reads.py`
+
+This script finds ONT reads which match expectations for TraDIS sequencing, and it outputs those reads trimmed down to their genomic sequence.
 
 Assuming this genomic configuration:
 ```
@@ -38,19 +58,7 @@ In order for a read to be included in the output, the following criteria must be
   alignments need to meet the thresholds set by the `--neg_id` and `--neg_gap` settings.
 
 
-
-
-## Installation
-
-This repo contains a stand-alone Python script, so no installation is required. You can run it directly from this repo, or copy it to somewhere in your `PATH` (e.g. `~/.local/bin`) for easier access.
-
-There is one external requirement: [minimap2](https://github.com/lh3/minimap2). If you can run `minimap2 -h` from the command line, you should be good to go.
-
-
-
-
-## Usage
-
+Full usage:
 ```
 usage: extract_tradis_ont_reads.py --reads READS --start START [--end END] [--neg NEG]
                                    [--min_id MIN_ID] [--max_gap MAX_GAP] [--neg_id NEG_ID]
@@ -76,6 +84,14 @@ Settings:
 Help:
   -h, --help         Show this help message and exit
 ```
+
+
+
+
+## `create_plot_files.py`
+
+This script create plot files compatible with [Artemis](https://www.sanger.ac.uk/tool/artemis/) and [Diana](https://diana.wytamma.com/).
+
 
 
 

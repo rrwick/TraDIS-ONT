@@ -31,7 +31,7 @@ def get_arguments():
                             help='Input ONT reads')
     input_args.add_argument('--start', type=pathlib.Path, required=True,
                             help='FASTA file containing the expected read-start sequence')
-    
+
     optional_args = parser.add_argument_group('Optional inputs')
     optional_args.add_argument('--end', type=pathlib.Path, required=False,
                                help='FASTA file containing the expected read-end sequence')
