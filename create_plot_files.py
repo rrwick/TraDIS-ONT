@@ -38,9 +38,9 @@ def get_arguments():
     setting_args = parser.add_argument_group('Settings')
     setting_args.add_argument('--min_id', type=float, default=95.0,
                               help='Minimum alignment identity for start/end seqs (default: 95)')
-    setting_args.add_argument('--max_start_gap', type=int, default=1,
+    setting_args.add_argument('--max_gap', type=int, default=5,
                               help='Maximum allowed unaligned bases at the start of a read '
-                                   '(default: 1)')
+                                   '(default: 5)')
 
     help_args = parser.add_argument_group('Help')
     help_args.add_argument('-h', '--help', action='help',
@@ -51,11 +51,11 @@ def get_arguments():
 
 def main():
     args = get_arguments()
+    args.out_dir.mkdir(parents=True, exist_ok=True)
     ta_site_counts, ref_lengths = count_ta_sites(args.ref)
     forward_counts, reverse_counts = get_per_site_counts(ref_lengths, ta_site_counts,
-                                                         args.alignments, args.min_id,
-                                                         args.max_start_gap)
-    create_plot_files(ref_lengths, forward_counts, reverse_counts)
+                                                         args.alignments, args.min_id, args.max_gap)
+    create_plot_files(ref_lengths, forward_counts, reverse_counts, args.out_dir)
 
 
 def count_ta_sites(filename):
@@ -72,18 +72,28 @@ def count_ta_sites(filename):
     return ta_counts, ref_lengths
 
 
-def get_per_site_counts(ref_lengths, ta_site_counts, alignments_filename, min_id, max_start_gap):
-    print(f'\nTallying unique insertion sites:', file=sys.stderr)
+def get_per_site_counts(ref_lengths, ta_site_counts, alignments_filename, min_id, max_gap):
     forward_counts, reverse_counts = {}, {}
     for name, length in ref_lengths.items():
         forward_counts[name] = [0] * length
         reverse_counts[name] = [0] * length
 
+    print(f'\nLoading alignments:', file=sys.stderr)
     with open(alignments_filename, 'rt') as paf_file:
+        total_alignments, used_alignments, secondary, low_id, big_gap = 0, 0, 0, 0, 0
         for line in paf_file:
             a = Alignment(line)
-            if a.secondary or a.percent_identity < min_id or a.query_start > max_start_gap:
+            total_alignments += 1
+            if a.secondary:
+                secondary += 1
                 continue
+            if a.percent_identity < min_id:
+                low_id += 1
+                continue
+            if a.query_start > max_gap:
+                big_gap += 1
+                continue
+            used_alignments += 1
             try:
                 if a.strand == '+':
                     forward_counts[a.ref_name][a.ref_start] += 1
@@ -93,7 +103,15 @@ def get_per_site_counts(ref_lengths, ta_site_counts, alignments_filename, min_id
                 sys.exit(f'\nError: {a.ref_name} not in reference genome')
             except IndexError:
                 sys.exit(f'\nError: incorrect sequence length for {a.ref_name}')
+    print(f'  total alignments: {total_alignments}', file=sys.stderr)
+    print('  rejected alignments:', file=sys.stderr)
+    print(f'    secondary: {secondary} ({100*secondary/total_alignments:.2f}%)', file=sys.stderr)
+    print(f'    low identity: {low_id} ({100*low_id/total_alignments:.2f}%)', file=sys.stderr)
+    print(f'    too much gap: {big_gap} ({100*big_gap/total_alignments:.2f}%)', file=sys.stderr)
+    print(f'  used alignments: {used_alignments} ({100*used_alignments/total_alignments:.2f}%)',
+          file=sys.stderr)
 
+    print(f'\nTallying insertion sites:', file=sys.stderr)
     unique_site_counts = {}
     for name, length in ref_lengths.items():
         unique_sites = sum(1 if forward_counts[name][i] > 0 or reverse_counts[name][i] > 0 else 0
@@ -103,15 +121,15 @@ def get_per_site_counts(ref_lengths, ta_site_counts, alignments_filename, min_id
         print(f'  {name}: {unique_sites} ({percent:.2f}%)', file=sys.stderr)
     total_sites = sum(unique_site_counts.values())
     percent = 100.0 * total_sites / sum(ta_site_counts.values())
-    print(f'  total unique insertion sites: {total_sites} ({percent:.2f}%)', file=sys.stderr)
+    print(f'  total insertion sites: {total_sites} ({percent:.2f}%)', file=sys.stderr)
 
     return forward_counts, reverse_counts
 
 
-def create_plot_files(ref_lengths, forward_counts, reverse_counts):
+def create_plot_files(ref_lengths, forward_counts, reverse_counts, out_dir):
     print(f'\nCreating plot files:', file=sys.stderr)
     for ref in ref_lengths.keys():
-        filename = f'{ref}.plot'
+        filename = out_dir / f'{ref}.plot'
         print(f'  {filename}', file=sys.stderr)
         with open(filename, 'wt') as f:
             for forward_count, reverse_count in zip(forward_counts[ref], reverse_counts[ref]):

@@ -18,7 +18,7 @@ There is one external requirement: [minimap2](https://github.com/lh3/minimap2). 
 
 ```bash
 extract_tradis_ont_reads.py --reads ont.fastq.gz --start start.fasta --end end.fasta > trimmed.fastq
-minimap2 -c -t 32 reference.fasta trimmed.fastq > alignments.paf
+minimap2 -c -t 16 reference.fasta trimmed.fastq > alignments.paf
 create_plot_files.py --ref reference.fasta --alignments alignments.paf --out_dir plot_files
 ```
 
@@ -58,7 +58,7 @@ In order for a read to be included in the output, the following criteria must be
   alignments need to meet the thresholds set by the `--neg_id` and `--neg_gap` settings.
 
 
-Full usage:
+### Full usage
 ```
 usage: extract_tradis_ont_reads.py --reads READS --start START [--end END] [--neg NEG]
                                    [--min_id MIN_ID] [--max_gap MAX_GAP] [--neg_id NEG_ID]
@@ -90,7 +90,36 @@ Help:
 
 ## `create_plot_files.py`
 
-This script create plot files compatible with [Artemis](https://www.sanger.ac.uk/tool/artemis/) and [Diana](https://diana.wytamma.com/).
+This script create plot files compatible with [Artemis](https://www.sanger.ac.uk/tool/artemis/) and [Diana](https://diana.wytamma.com/). One plot file is made for each sequence in the reference genome, each line in the file corresponds to a position in that sequence, and there are two numbers on each line: the insertion count for the forward strand and the insertion count for the reverse strand.
+
+The following alignments will be ignored:
+* Secondary alignments (those with a `tp:A:S` tag).
+* Low-identity alignments (as determined by the `--min_id` setting).
+* Alignments too far from the start of the read (as determined by the `--max_gap` setting). It is therefore crucial that the reads have been properly trimmed (by `extract_tradis_ont_reads.py`) so they align from the start of their sequence.
+
+When run, this script will also display some stats to stderr, such as the number of `TA` sites in the reference genome and the number of insertion sites found.
+
+
+### Full usage
+```
+usage: create_plot_files.py --alignments ALIGNMENTS --ref REF --out_dir OUT_DIR [--min_id MIN_ID]
+                            [--max_gap MAX_GAP] [-h]
+
+Generate plot files from alignments
+
+Required inputs:
+  --alignments ALIGNMENTS
+                        Read alignments in PAF format
+  --ref REF             FASTA file containing the reference sequence
+  --out_dir OUT_DIR     Output directory for plot files (will be created if necessary)
+
+Settings:
+  --min_id MIN_ID       Minimum alignment identity for start/end seqs (default: 95)
+  --max_gap MAX_GAP     Maximum allowed unaligned bases at the start of a read (default: 5)
+
+Help:
+  -h, --help            Show this help message and exit
+```
 
 
 
