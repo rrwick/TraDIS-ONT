@@ -7,7 +7,7 @@
 
 ## Installation
 
-This repo contains stand-alone Python scripts, so no installation is required. You can run the scripts directly from this repo, or copy them to somewhere in your `PATH` (e.g. `~/.local/bin`) for easier access.
+This repo contains stand-alone Python scripts, so no installation is required. You can run the scripts directly from this repo, or copy them to somewhere in your `PATH` (e.g. `~/.local/bin`) for easier access. Python 3.7 or later is required to run the scripts.
 
 There is one external requirement: [minimap2](https://github.com/lh3/minimap2). If you can run `minimap2 -h` from the command line, you should be good to go.
 
