@@ -50,6 +50,9 @@ def get_arguments():
                                    '(default: 95)')
     setting_args.add_argument('--neg_gap', type=int, default=5,
                               help='Maximum allowed gap in bp for negative seqs (default: 5)')
+    setting_args.add_argument('--trim', type=int, default=None,
+                              help='Trim output reads so they do not exceed this length (default: '
+                                   'do not trim to a target length)')
     setting_args.add_argument('--threads', type=int, default=8,
                               help='Threads to use for alignment (default: 8)')
 
@@ -63,10 +66,10 @@ def get_arguments():
 def main():
     args = get_arguments()
     extract_reads(args.reads, args.start, args.end, args.neg, args.threads,
-                  args.min_id, args.max_gap, args.neg_id, args.neg_gap)
+                  args.min_id, args.max_gap, args.neg_id, args.neg_gap, args.trim)
 
 
-def extract_reads(reads, start, end, neg, threads, min_id, max_gap, neg_id, neg_gap):
+def extract_reads(reads, start, end, neg, threads, min_id, max_gap, neg_id, neg_gap, trim):
     """
     This function contains the tool's main functionality. It's factored out of the main function
     for easier testing.
@@ -126,6 +129,9 @@ def extract_reads(reads, start, end, neg, threads, min_id, max_gap, neg_id, neg_
         if len(trimmed_seq) == 0:
             zero_length += 1
             continue
+        if trim is not None:
+            trimmed_seq = trimmed_seq[:trim]
+            trimmed_qual = trimmed_qual[:trim]
 
         print(f'{header}\n{trimmed_seq}\n+\n{trimmed_qual}')
         passed += 1
@@ -278,7 +284,7 @@ def test_extract_reads_01a(capfd):
     """
     test_dir, start, end, neg = get_test_files()
     reads = test_dir / 'test_01.fastq'
-    extract_reads(reads, start, end, neg, 8, 95, 5, 95, 5)
+    extract_reads(reads, start, end, neg, 8, 95, 5, 95, 5, None)
     out, err = capfd.readouterr()
     assert out == ''
     assert '0 reads outputted' in err
@@ -287,7 +293,7 @@ def test_extract_reads_01a(capfd):
 def test_extract_reads_01b(capfd):
     test_dir, start, end, neg = get_test_files()
     reads = test_dir / 'test_01.fastq'
-    extract_reads(reads, start, None, neg, 8, 95, 5, 95, 5)
+    extract_reads(reads, start, None, neg, 8, 95, 5, 95, 5, None)
     out, err = capfd.readouterr()
     assert out == ''
     assert '0 reads outputted' in err
@@ -302,7 +308,7 @@ def test_extract_reads_02a(capfd):
     """
     test_dir, start, end, neg = get_test_files()
     reads = test_dir / 'test_02.fastq'
-    extract_reads(reads, start, end, neg, 8, 95, 5, 95, 5)
+    extract_reads(reads, start, end, neg, 8, 95, 5, 95, 5, None)
     out, err = capfd.readouterr()
     out_lines = out.splitlines()
     assert out_lines[1].startswith('GAACA')
@@ -320,12 +326,47 @@ def test_extract_reads_02b(capfd):
     """
     test_dir, start, end, neg = get_test_files()
     reads = test_dir / 'test_02.fastq'
-    extract_reads(reads, start, None, neg, 8, 95, 5, 95, 5)
+    extract_reads(reads, start, None, neg, 8, 95, 5, 95, 5, None)
     out, err = capfd.readouterr()
     out_lines = out.splitlines()
     assert out_lines[1].startswith('GAACA')
     assert out_lines[1].endswith('AGAAA')
     assert len(out_lines[1]) == len(out_lines[3]) == 1060
+    assert '1 read outputted' in err
+
+
+def test_extract_reads_02c(capfd):
+    """
+    This read has:
+    * The entire start seq (`ACTTG...TGTTA`)
+    * A middle bit (`GAACA...TTCAT`)
+    * The entire end seq (`AGATC...AGAAA`)
+    """
+    test_dir, start, end, neg = get_test_files()
+    reads = test_dir / 'test_02.fastq'
+    extract_reads(reads, start, end, neg, 8, 95, 5, 95, 5, 150)
+    out, err = capfd.readouterr()
+    out_lines = out.splitlines()
+    assert out_lines[1].startswith('GAACA')
+    assert out_lines[1].endswith('ATCGG')
+    assert len(out_lines[1]) == len(out_lines[3]) == 150
+    assert '1 read outputted' in err
+
+
+def test_extract_reads_02d(capfd):
+    """
+    This read has:
+    * The entire start seq (`ACTTG...TGTTA`)
+    * A middle bit (`GAACA...TTCAT`)
+    * The entire end seq (`AGATC...AGAAA`)
+    """
+    test_dir, start, end, neg = get_test_files()
+    reads = test_dir / 'test_02.fastq'
+    extract_reads(reads, start, end, neg, 8, 95, 5, 95, 5, 10)
+    out, err = capfd.readouterr()
+    out_lines = out.splitlines()
+    assert out_lines[1] == 'GAACAATCCA'
+    assert len(out_lines[1]) == len(out_lines[3]) == 10
     assert '1 read outputted' in err
 
 
@@ -336,7 +377,7 @@ def test_extract_reads_03a(capfd):
     """
     test_dir, start, end, neg = get_test_files()
     reads = test_dir / 'test_03.fastq'
-    extract_reads(reads, start, end, neg, 8, 95, 5, 95, 5)
+    extract_reads(reads, start, end, neg, 8, 95, 5, 95, 5, None)
     out, err = capfd.readouterr()
     out_lines = out.splitlines()
     assert out_lines[1].startswith('GAACA')
@@ -348,7 +389,7 @@ def test_extract_reads_03a(capfd):
 def test_extract_reads_03b(capfd):
     test_dir, start, end, neg = get_test_files()
     reads = test_dir / 'test_03.fastq'
-    extract_reads(reads, start, None, neg, 8, 95, 5, 95, 5)
+    extract_reads(reads, start, None, neg, 8, 95, 5, 95, 5, None)
     out, err = capfd.readouterr()
     out_lines = out.splitlines()
     assert out_lines[1].startswith('GAACA')
@@ -370,7 +411,7 @@ def test_extract_reads_04a(capfd):
     """
     test_dir, start, end, neg = get_test_files()
     reads = test_dir / 'test_04.fastq'
-    extract_reads(reads, start, end, neg, 8, 95, 5, 95, 5)
+    extract_reads(reads, start, end, neg, 8, 95, 5, 95, 5, None)
     out, err = capfd.readouterr()
     assert out == ''
     assert '0 reads outputted' in err
@@ -379,7 +420,7 @@ def test_extract_reads_04a(capfd):
 def test_extract_reads_04b(capfd):
     test_dir, start, end, neg = get_test_files()
     reads = test_dir / 'test_04.fastq'
-    extract_reads(reads, start, end, None, 8, 95, 5, 95, 5)
+    extract_reads(reads, start, end, None, 8, 95, 5, 95, 5, None)
     out, err = capfd.readouterr()
     out_lines = out.splitlines()
     assert out_lines[1].startswith('GCATG')
@@ -391,7 +432,7 @@ def test_extract_reads_04b(capfd):
 def test_extract_reads_04c(capfd):
     test_dir, start, end, neg = get_test_files()
     reads = test_dir / 'test_04.fastq'
-    extract_reads(reads, start, None, neg, 8, 95, 5, 95, 5)
+    extract_reads(reads, start, None, neg, 8, 95, 5, 95, 5, None)
     out, err = capfd.readouterr()
     assert out == ''
     assert '0 reads outputted' in err
@@ -400,7 +441,7 @@ def test_extract_reads_04c(capfd):
 def test_extract_reads_04d(capfd):
     test_dir, start, end, neg = get_test_files()
     reads = test_dir / 'test_04.fastq'
-    extract_reads(reads, start, None, None, 8, 95, 5, 95, 5)
+    extract_reads(reads, start, None, None, 8, 95, 5, 95, 5, None)
     out, err = capfd.readouterr()
     out_lines = out.splitlines()
     assert out_lines[1].startswith('GCATG')
@@ -416,7 +457,7 @@ def test_extract_reads_05a(capfd):
     """
     test_dir, start, end, neg = get_test_files()
     reads = test_dir / 'test_05.fastq'
-    extract_reads(reads, start, end, neg, 8, 95, 4, 95, 5)
+    extract_reads(reads, start, end, neg, 8, 95, 4, 95, 5, None)
     out, err = capfd.readouterr()
     out_lines = out.splitlines()
     assert out_lines[1].startswith('GAACA')
@@ -428,7 +469,7 @@ def test_extract_reads_05a(capfd):
 def test_extract_reads_05b(capfd):
     test_dir, start, end, neg = get_test_files()
     reads = test_dir / 'test_05.fastq'
-    extract_reads(reads, start, end, neg, 8, 95, 3, 95, 5)
+    extract_reads(reads, start, end, neg, 8, 95, 3, 95, 5, None)
     out, err = capfd.readouterr()
     assert out == ''
     assert '0 reads outputted' in err
@@ -441,7 +482,7 @@ def test_extract_reads_06a(capfd):
     """
     test_dir, start, end, neg = get_test_files()
     reads = test_dir / 'test_06.fastq'
-    extract_reads(reads, start, end, neg, 8, 98, 4, 95, 5)
+    extract_reads(reads, start, end, neg, 8, 98, 4, 95, 5, None)
     out, err = capfd.readouterr()
     out_lines = out.splitlines()
     assert out_lines[1].startswith('GAACA')
@@ -453,7 +494,7 @@ def test_extract_reads_06a(capfd):
 def test_extract_reads_06b(capfd):
     test_dir, start, end, neg = get_test_files()
     reads = test_dir / 'test_06.fastq'
-    extract_reads(reads, start, end, neg, 8, 99, 3, 95, 5)
+    extract_reads(reads, start, end, neg, 8, 99, 3, 95, 5, None)
     out, err = capfd.readouterr()
     assert out == ''
     assert '0 reads outputted' in err
@@ -466,7 +507,7 @@ def test_extract_reads_07a(capfd):
     """
     test_dir, start, end, neg = get_test_files()
     reads = test_dir / 'test_07.fastq'
-    extract_reads(reads, start, end, neg, 8, 95, 5, 95, 5)
+    extract_reads(reads, start, end, neg, 8, 95, 5, 95, 5, None)
     out, err = capfd.readouterr()
     assert out == ''
     assert '0 reads outputted' in err
@@ -475,7 +516,7 @@ def test_extract_reads_07a(capfd):
 def test_extract_reads_07b(capfd):
     test_dir, start, end, neg = get_test_files()
     reads = test_dir / 'test_07.fastq'
-    extract_reads(reads, start, None, neg, 8, 95, 5, 95, 5)
+    extract_reads(reads, start, None, neg, 8, 95, 5, 95, 5, None)
     out, err = capfd.readouterr()
     out_lines = out.splitlines()
     assert out_lines[1].startswith('GCCGG')
@@ -491,7 +532,7 @@ def test_extract_reads_08a(capfd):
     """
     test_dir, start, end, neg = get_test_files()
     reads = test_dir / 'test_08.fastq'
-    extract_reads(reads, start, end, neg, 8, 95, 5, 95, 5)
+    extract_reads(reads, start, end, neg, 8, 95, 5, 95, 5, None)
     out, err = capfd.readouterr()
     assert out == ''
     assert '0 reads outputted' in err
@@ -500,7 +541,7 @@ def test_extract_reads_08a(capfd):
 def test_extract_reads_08b(capfd):
     test_dir, start, end, neg = get_test_files()
     reads = test_dir / 'test_08.fastq'
-    extract_reads(reads, start, None, neg, 8, 95, 5, 95, 5)
+    extract_reads(reads, start, None, neg, 8, 95, 5, 95, 5, None)
     out, err = capfd.readouterr()
     out_lines = out.splitlines()
     assert out_lines[1].startswith('TTGTT')

@@ -62,7 +62,7 @@ In order for a read to be included in the output, the following criteria must be
 ```
 usage: extract_tradis_ont_reads.py --reads READS --start START [--end END] [--neg NEG]
                                    [--min_id MIN_ID] [--max_gap MAX_GAP] [--neg_id NEG_ID]
-                                   [--neg_gap NEG_GAP] [--threads THREADS] [-h]
+                                   [--neg_gap NEG_GAP] [--trim TRIM] [--threads THREADS] [-h]
 
 Extract TraDIS ONT reads
 
@@ -79,6 +79,8 @@ Settings:
   --max_gap MAX_GAP  Maximum allowed gap in bp for start/end seqs (default: 5)
   --neg_id NEG_ID    Minimum alignment percent identity for negative seqs (default: 95)
   --neg_gap NEG_GAP  Maximum allowed gap in bp for negative seqs (default: 5)
+  --trim TRIM        Trim output reads so they do not exceed this length (default: do not trim
+                     to a target length)
   --threads THREADS  Threads to use for alignment (default: 8)
 
 Help:
