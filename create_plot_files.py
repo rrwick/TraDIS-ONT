@@ -19,13 +19,15 @@ see <https://www.gnu.org/licenses/>.
 """
 
 import argparse
+import collections
 import gzip
 import pathlib
 import sys
 
 
 def get_arguments():
-    parser = argparse.ArgumentParser(description='Generate plot files from alignments', add_help=False)
+    parser = argparse.ArgumentParser(description='Generate plot files from alignments',
+                                     add_help=False)
 
     input_args = parser.add_argument_group('Required inputs')
     input_args.add_argument('--alignments', type=pathlib.Path, required=True,
@@ -41,6 +43,8 @@ def get_arguments():
     setting_args.add_argument('--max_gap', type=int, default=5,
                               help='Maximum allowed unaligned bases at the start of a read '
                                    '(default: 5)')
+    setting_args.add_argument('--exclude_non_ta', action='store_true',
+                              help='Exclude all non-TA sites from counts and plot files')
 
     help_args = parser.add_argument_group('Help')
     help_args.add_argument('-h', '--help', action='help',
@@ -52,27 +56,44 @@ def get_arguments():
 def main():
     args = get_arguments()
     args.out_dir.mkdir(parents=True, exist_ok=True)
-    ta_site_counts, ref_lengths = count_ta_sites(args.ref)
-    forward_counts, reverse_counts = get_per_site_counts(ref_lengths, ta_site_counts,
-                                                         args.alignments, args.min_id, args.max_gap)
+    ta_counts, ref_lengths, forward_ta_sites, reverse_ta_sites = count_ta_sites(args.ref)
+    forward_counts, reverse_counts = \
+        get_per_site_counts(ref_lengths, ta_counts, forward_ta_sites, reverse_ta_sites,
+                            args.exclude_non_ta, args.alignments, args.min_id, args.max_gap)
     create_plot_files(ref_lengths, forward_counts, reverse_counts, args.out_dir)
 
 
 def count_ta_sites(filename):
+    """
+    This function counts TA sites and remembers their location on each strand.
+    Example of TA-site strand adjustment:
+       ATCGTACAG
+           *       TA index
+             *-->  forward-adjusted TA location (+2)
+       <--*        reverse-adjusted TA location (-1)
+    """
     print(f'\nCounting TA sites in {filename}:', file=sys.stderr)
     ta_counts = {}
+    forward_ta_sites = collections.defaultdict(set)
+    reverse_ta_sites = collections.defaultdict(set)
     ref_lengths = {}
     for name, seq in iterate_fasta(filename):
-        ta_count = seq.count('TA')
+        ta_count = 0
+        for i in range(len(seq) - 1):
+            if seq[i:i+2] == 'TA':
+                ta_count += 1
+                forward_ta_sites[name].add(i+2)
+                reverse_ta_sites[name].add(i-1)
         print(f'  {name}: {ta_count}', file=sys.stderr)
         ta_counts[name] = ta_count
         ref_lengths[name] = len(seq)
     ta_total = sum(ta_counts.values())
     print(f'  total TA sites: {ta_total}', file=sys.stderr)
-    return ta_counts, ref_lengths
+    return ta_counts, ref_lengths, forward_ta_sites, reverse_ta_sites
 
 
-def get_per_site_counts(ref_lengths, ta_site_counts, alignments_filename, min_id, max_gap):
+def get_per_site_counts(ref_lengths, ta_counts, forward_ta_sites, reverse_ta_sites, exclude_non_ta,
+                        alignments_filename, min_id, max_gap):
     forward_counts, reverse_counts = {}, {}
     for name, length in ref_lengths.items():
         forward_counts[name] = [0] * length
@@ -111,19 +132,42 @@ def get_per_site_counts(ref_lengths, ta_site_counts, alignments_filename, min_id
     print(f'  used alignments: {used_alignments} ({100*used_alignments/total_alignments:.2f}%)',
           file=sys.stderr)
 
+    if exclude_non_ta:
+        exclude_non_ta_sites(ref_lengths, forward_counts, reverse_counts,
+                             forward_ta_sites, reverse_ta_sites)
+
     print(f'\nTallying insertion sites:', file=sys.stderr)
     unique_site_counts = {}
     for name, length in ref_lengths.items():
         unique_sites = sum(1 if forward_counts[name][i] > 0 or reverse_counts[name][i] > 0 else 0
                            for i in range(length))
         unique_site_counts[name] = unique_sites
-        percent = 100.0 * unique_sites / ta_site_counts[name]
+        percent = 100.0 * unique_sites / ta_counts[name]
         print(f'  {name}: {unique_sites} ({percent:.2f}%)', file=sys.stderr)
     total_sites = sum(unique_site_counts.values())
-    percent = 100.0 * total_sites / sum(ta_site_counts.values())
+    percent = 100.0 * total_sites / sum(ta_counts.values())
     print(f'  total insertion sites: {total_sites} ({percent:.2f}%)', file=sys.stderr)
 
     return forward_counts, reverse_counts
+
+
+def exclude_non_ta_sites(ref_lengths, forward_counts, reverse_counts,
+                         forward_ta_sites, reverse_ta_sites):
+    """
+    If the --exclude_non_ta option was used, any site which is not a TA-site gets dropped.
+    """
+    print(f'\nExcluding non-TA sites:', file=sys.stderr)
+    forward_discard_count, reverse_discard_count = 0, 0
+    for name, length in ref_lengths.items():
+        for i in range(length):
+            if i not in forward_ta_sites[name] and forward_counts[name][i] > 0:
+                 forward_counts[name][i] = 0
+                 forward_discard_count += 1
+            if i not in reverse_ta_sites[name] and reverse_counts[name][i] > 0:
+                 reverse_counts[name][i] = 0
+                 reverse_discard_count += 1
+    print(f'  Discarded forward-strand sites: {forward_discard_count}', file=sys.stderr)
+    print(f'  Discarded reverse-strand sites: {reverse_discard_count}', file=sys.stderr)
 
 
 def create_plot_files(ref_lengths, forward_counts, reverse_counts, out_dir):
