@@ -105,7 +105,8 @@ When run, this script will also display some stats to stderr, such as the number
 ### Full usage
 ```
 usage: create_plot_files.py --alignments ALIGNMENTS --ref REF --out_dir OUT_DIR
-                            [--min_id MIN_ID] [--max_gap MAX_GAP] [--exclude_non_ta] [-h]
+                            [--min_id MIN_ID] [--max_gap MAX_GAP] [--exclude_non_ta]
+                            [--exclude_sites_below EXCLUDE_SITES_BELOW] [-h]
 
 Generate plot files from alignments
 
@@ -119,6 +120,9 @@ Settings:
   --min_id MIN_ID       Minimum alignment identity for start/end seqs (default: 95)
   --max_gap MAX_GAP     Maximum allowed unaligned bases at the start of a read (default: 5)
   --exclude_non_ta      Exclude all insertions at non-TA sites
+  --exclude_sites_below EXCLUDE_SITES_BELOW
+                        Sites with fewer than this many insertions will be rounded down to 0
+                        (default: 1, i.e. no exclusion)
 
 Help:
   -h, --help            Show this help message and exit

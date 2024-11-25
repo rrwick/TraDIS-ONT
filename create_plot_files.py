@@ -44,7 +44,10 @@ def get_arguments():
                               help='Maximum allowed unaligned bases at the start of a read '
                                    '(default: 5)')
     setting_args.add_argument('--exclude_non_ta', action='store_true',
-                              help='Exclude all non-TA sites from counts and plot files')
+                              help='Exclude all insertions at non-TA sites')
+    setting_args.add_argument('--exclude_sites_below', type=int, default=1,
+                              help='Sites with fewer than this many insertions will be rounded '
+                                   'down to 0 (default: 1, i.e. no exclusion)')
 
     help_args = parser.add_argument_group('Help')
     help_args.add_argument('-h', '--help', action='help',
@@ -59,7 +62,8 @@ def main():
     ta_counts, ref_lengths, forward_ta_sites, reverse_ta_sites = count_ta_sites(args.ref)
     forward_counts, reverse_counts = \
         get_per_site_counts(ref_lengths, ta_counts, forward_ta_sites, reverse_ta_sites,
-                            args.exclude_non_ta, args.alignments, args.min_id, args.max_gap)
+                            args.exclude_non_ta, args.exclude_sites_below, args.alignments,
+                            args.min_id, args.max_gap)
     create_plot_files(ref_lengths, forward_counts, reverse_counts, args.out_dir)
 
 
@@ -93,7 +97,7 @@ def count_ta_sites(filename):
 
 
 def get_per_site_counts(ref_lengths, ta_counts, forward_ta_sites, reverse_ta_sites, exclude_non_ta,
-                        alignments_filename, min_id, max_gap):
+                        exclude_sites_below, alignments_filename, min_id, max_gap):
     forward_counts, reverse_counts = {}, {}
     for name, length in ref_lengths.items():
         forward_counts[name] = [0] * length
@@ -135,6 +139,10 @@ def get_per_site_counts(ref_lengths, ta_counts, forward_ta_sites, reverse_ta_sit
     if exclude_non_ta:
         exclude_non_ta_sites(ref_lengths, forward_counts, reverse_counts,
                              forward_ta_sites, reverse_ta_sites)
+    if exclude_sites_below > 1:
+        exclude_low_insertion_sites(ref_lengths, forward_counts, reverse_counts,
+                                    exclude_sites_below)
+
 
     print(f'\nTallying insertion sites:', file=sys.stderr)
     unique_site_counts = {}
@@ -164,6 +172,24 @@ def exclude_non_ta_sites(ref_lengths, forward_counts, reverse_counts,
                  forward_counts[name][i] = 0
                  forward_discard_count += 1
             if i not in reverse_ta_sites[name] and reverse_counts[name][i] > 0:
+                 reverse_counts[name][i] = 0
+                 reverse_discard_count += 1
+    print(f'  Discarded forward-strand sites: {forward_discard_count}', file=sys.stderr)
+    print(f'  Discarded reverse-strand sites: {reverse_discard_count}', file=sys.stderr)
+
+
+def exclude_low_insertion_sites(ref_lengths, forward_counts, reverse_counts, threshold):
+    """
+    If the --exclude_sites_below option was used, any site which has fewer insertions gets dropped.
+    """
+    print(f'\nExcluding low-insertion-count sites:', file=sys.stderr)
+    forward_discard_count, reverse_discard_count = 0, 0
+    for name, length in ref_lengths.items():
+        for i in range(length):
+            if 0 < forward_counts[name][i] < threshold:
+                 forward_counts[name][i] = 0
+                 forward_discard_count += 1
+            if 0 < reverse_counts[name][i] < threshold:
                  reverse_counts[name][i] = 0
                  reverse_discard_count += 1
     print(f'  Discarded forward-strand sites: {forward_discard_count}', file=sys.stderr)
