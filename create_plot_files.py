@@ -45,9 +45,10 @@ def get_arguments():
                                    '(default: 5)')
     setting_args.add_argument('--exclude_non_ta', action='store_true',
                               help='Exclude all insertions at non-TA sites')
-    setting_args.add_argument('--exclude_sites_below', type=int, default=1,
+    setting_args.add_argument('--exclude_sites_below', type=int, default=2,
                               help='Sites with fewer than this many insertions will be rounded '
-                                   'down to 0 (default: 1, i.e. no exclusion)')
+                                   'down to 0 (default: 2, i.e. exclude sites with only 1 '
+                                   'insertion)')
 
     help_args = parser.add_argument_group('Help')
     help_args.add_argument('-h', '--help', action='help',

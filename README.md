@@ -122,7 +122,7 @@ Settings:
   --exclude_non_ta      Exclude all insertions at non-TA sites
   --exclude_sites_below EXCLUDE_SITES_BELOW
                         Sites with fewer than this many insertions will be rounded down to 0
-                        (default: 1, i.e. no exclusion)
+                        (default: 2, i.e. exclude sites with only 1 insertion)
 
 Help:
   -h, --help            Show this help message and exit
