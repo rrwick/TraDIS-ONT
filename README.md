@@ -114,7 +114,7 @@ Required inputs:
   --alignments ALIGNMENTS
                         Read alignments in PAF format
   --ref REF             FASTA file containing the reference sequence
-  --out_dir OUT_DIR     Output directory for plot files (will be created if necessary)
+  --out_dir OUT_DIR     Output directory (will be created if necessary)
 
 Settings:
   --min_id MIN_ID       Minimum alignment identity for start/end seqs (default: 95)

@@ -35,7 +35,7 @@ def get_arguments():
     input_args.add_argument('--ref', type=pathlib.Path, required=True,
                             help='FASTA file containing the reference sequence')
     input_args.add_argument('--out_dir', type=pathlib.Path, required=True,
-                            help='Output directory for plot files (will be created if necessary)')
+                            help='Output directory (will be created if necessary)')
 
     setting_args = parser.add_argument_group('Settings')
     setting_args.add_argument('--min_id', type=float, default=95.0,
@@ -65,7 +65,7 @@ def main():
         get_per_site_counts(ref_lengths, ta_counts, forward_ta_sites, reverse_ta_sites,
                             args.exclude_non_ta, args.exclude_sites_below, args.alignments,
                             args.min_id, args.max_gap)
-    create_plot_files(ref_lengths, forward_counts, reverse_counts, args.out_dir)
+    create_output_files(ref_lengths, forward_counts, reverse_counts, args.out_dir)
 
 
 def count_ta_sites(filename):
@@ -197,15 +197,34 @@ def exclude_low_insertion_sites(ref_lengths, forward_counts, reverse_counts, thr
     print(f'  Discarded reverse-strand sites: {reverse_discard_count}', file=sys.stderr)
 
 
-def create_plot_files(ref_lengths, forward_counts, reverse_counts, out_dir):
+def create_output_files(ref_lengths, forward_counts, reverse_counts, out_dir):
     print(f'\nCreating plot files:', file=sys.stderr)
+    create_userplot_files(ref_lengths, forward_counts, reverse_counts, out_dir)
+    create_wig_file(ref_lengths, forward_counts, reverse_counts, out_dir)
+    print(file=sys.stderr)
+
+
+def create_userplot_files(ref_lengths, forward_counts, reverse_counts, out_dir):
     for ref in ref_lengths.keys():
         filename = out_dir / f'{ref}.plot'
         print(f'  {filename}', file=sys.stderr)
         with open(filename, 'wt') as f:
             for forward_count, reverse_count in zip(forward_counts[ref], reverse_counts[ref]):
                 f.write(f'{forward_count} {reverse_count}\n')
-    print(file=sys.stderr)
+
+
+def create_wig_file(ref_lengths, forward_counts, reverse_counts, out_dir):
+    filename = out_dir / 'insertions.wig'
+    print(f'  {filename}', file=sys.stderr)
+    with open(filename, 'wt') as f:
+        for ref in ref_lengths.keys():
+            f.write(f'variableStep chrom={ref}\n')
+            for i, (forward_count, reverse_count) in enumerate(zip(forward_counts[ref],
+                                                                   reverse_counts[ref])):
+                if forward_count > 0:
+                    f.write(f'{i+1} {forward_count}\n')
+                if reverse_count > 0:
+                    f.write(f'{i+1} {-reverse_count}\n')
 
 
 class Alignment(object):
