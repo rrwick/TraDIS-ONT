@@ -2,6 +2,15 @@
 
 [![License GPL v3](https://img.shields.io/badge/license-GPL%20v3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0.en.html)
 
+Transposon-directed insertion-site sequencing (TraDIS) is a method for identifying genes involved in bacterial survival under specific conditions. This repository provides command-line scripts for processing Oxford Nanopore Technologies (ONT) amplicon reads generated from TraDIS experiments.
+
+These scripts extract reads containing transposon-genome junctions, trim them and convert alignment data into genome plot files which can be visualised using [Diana](https://diana.wytamma.com), a web-based tool for TraDIS data exploration.
+
+The method is described in detail in the following publication:<br>
+[**Krause AL, Wirth W, Turner AM, Judd L, Li L, van Schaik W, Howden BP, Carter GP, Seemann T, Wick R, Stinear TP, Buultjens AH, Monk IR. Transposon-directed insertion-site sequencing (TraDIS) analysis of Enterococcus faecium using nanopore sequencing and a WebAssembly analysis platform. Microbiology Spectrum. 2025. doi:10.1128/spectrum.00628-25.**](https://doi.org/10.1128/spectrum.00628-25)
+
+To run these scripts via a web portal (instead of the command line), visit the [Centre for Pathogen Genomics Bioinformatics Analysis Portal](https://portal.cpg.unimelb.edu.au).
+
 
 
 
@@ -92,7 +101,7 @@ Help:
 
 ## `create_plot_files.py`
 
-This script create plot files compatible with [Artemis](https://www.sanger.ac.uk/tool/artemis/) and [Diana](https://diana.wytamma.com/). One plot file is made for each sequence in the reference genome, each line in the file corresponds to a position in that sequence, and there are two numbers on each line: the insertion count for the forward strand and the insertion count for the reverse strand.
+This script create plot files compatible with [Artemis](https://www.sanger.ac.uk/tool/artemis) and [Diana](https://diana.wytamma.com). One plot file is made for each sequence in the reference genome, each line in the file corresponds to a position in that sequence, and there are two numbers on each line: the insertion count for the forward strand and the insertion count for the reverse strand.
 
 The following alignments will be ignored:
 * Secondary alignments (those with a `tp:A:S` tag).
